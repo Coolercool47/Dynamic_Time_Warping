@@ -1,10 +1,12 @@
-﻿#include <iostream>
+#include <iostream>
 #include <set>
 #include <tuple>
+#include <chrono>
 
 #define ME "Memory error"
 
 using namespace std;
+using namespace std::chrono;
 
 typedef tuple <int, int> ids;
 class dynamic_time_warping
@@ -205,7 +207,7 @@ public:
     void print_way()
     {
         cout << dynamic_time_warping::len_way << "\n";
-        for (int i = dynamic_time_warping::len_way - 1; i >= 0; i--) cout << "(" << dynamic_time_warping::way_coords[i][0] << ", " << dynamic_time_warping::way_coords[i][1] << ") " << dynamic_time_warping::way[i] << " ";
+        for (int i = dynamic_time_warping::len_way - 1; i >= 0; i--) cout << "(" << dynamic_time_warping::way_coords[i][0] << ", " << dynamic_time_warping::way_coords[i][1] << ") ";
         cout << "\n";
     }
 
@@ -228,14 +230,14 @@ public:
     fast_dynamic_time_warping(const double* c, const double* q, const int len_c, const int len_q, const int radius) : dynamic_time_warping(c, q, len_c, len_q)
     {
         fast_dynamic_time_warping::radius = radius;
-        fast_dynamic_time_warping::window = new ids;
+        fast_dynamic_time_warping::window = new ids[len_q * len_c];
         fast_dynamic_time_warping::len_window = 0;
     }
 
     fast_dynamic_time_warping(const fast_dynamic_time_warping& C) : dynamic_time_warping(C.c, C.q, C.len_c, C.len_q)
     {
         fast_dynamic_time_warping::radius = C.radius;
-        fast_dynamic_time_warping::window = new ids;
+        fast_dynamic_time_warping::window = new ids[C.len_q * C.len_c];
         fast_dynamic_time_warping::len_window = 0;
     }
 
@@ -249,7 +251,6 @@ public:
     {
         if (len_c < radius + 2 || len_q < radius + 2)
         {
-            window = new ids;
             if (window == nullptr) throw 'e';
             len_window = 0;
             for (int i = 0; i < len_c; i++)
@@ -262,7 +263,6 @@ public:
                 }
             }
             local_dtw(c, q, len_c, len_q);
-            print_way();
             return;
         }
         double* c_shrinked = reduce_by_half(c, len_c);
@@ -270,7 +270,6 @@ public:
         double* q_shrinked = reduce_by_half(q, len_q);
         if (q_shrinked == nullptr) throw 'e';
         fast_dtw_inner(c_shrinked, q_shrinked, len_c / 2, len_q / 2, radius);
-        print_way();
         expand_window(len_c, len_q, radius);
         local_dtw(c, q, len_c, len_q);
         return;
@@ -316,7 +315,6 @@ public:
                 }
             }
         }
-        window = new ids;
         len_window = 0;
         int start_j = 0;
         for (int i = 0; i < len_c; i++)
@@ -344,7 +342,6 @@ public:
     }
     void local_dtw(const double* c, const double* q, const int dlen_c, const int dlen_q)
     {
-        cout << dlen_c << " " << dlen_q << "\n";
         double** loc_matrix = new double*[len_c];
         if (loc_matrix == nullptr) throw 'e';
         for (int i = 0; i < dlen_c; i++)
@@ -374,7 +371,7 @@ public:
                 loc_matrix[a][b] += loc_matrix[a][b - 1];
             }
         }
-        int** loc_way = new int*;
+        int** loc_way = new int*[dlen_c + dlen_q];
         if (loc_way == nullptr) throw 'e';
         int len_loc_way = 0;
         int i = dlen_c - 1;
@@ -383,7 +380,6 @@ public:
         {
             loc_way[len_loc_way] = new int[2];
             if (loc_way[len_loc_way] == nullptr) throw 'e';
-            cout << i << " " << j << "\n";
             loc_way[len_loc_way][0] = j;
             loc_way[len_loc_way][1] = i;
             len_loc_way++;
@@ -412,28 +408,21 @@ public:
                 i--;
             }
         }
+        
+        len_way = 0;
         for (int i = 0; i < len_loc_way; i++)
-        {
-            cout << loc_way[i][0] << " " << loc_way[i][1] << "\n";
-        }
-        way_coords = new int*;
-        if (way_coords == nullptr) throw 'e';
-        way_coords[0] = new int[2];
-        if (way_coords[0] == nullptr) throw 'e';
-        way_coords[0][0] = 0;
-        way_coords[0][1] = 0;
-        len_way = 1;
-        cout << way_coords[0][0] << " " << way_coords[0][1] << "\n";
-        for (int i = len_loc_way; i > 0; i--)
         {
             way_coords[len_way] = new int[2];
             if (way_coords[len_way] == nullptr) throw 'e';
-            way_coords[len_way][0] = loc_way[i-1][0];
-            way_coords[len_way][1] = loc_way[i-1][1];
-            cout << way_coords[len_way][0] << " " << way_coords[len_way][1] << "\n";
+            way_coords[len_way][0] = loc_way[i][0];
+            way_coords[len_way][1] = loc_way[i][1];
             len_way++;
-            
         }
+        way_coords[len_way] = new int[2];
+        if (way_coords[len_way] == nullptr) throw 'e';
+        way_coords[len_way][0] = 0;
+        way_coords[len_way][1] = 0;
+        len_way++;
     }
 };
 
@@ -447,6 +436,7 @@ protected:
     double* quant_c;
 public:
 
+    // Конструктор, пока только заполненый, потом допишу пустой
     Sparce_DTW(double* c_seq, double* q_seq, const int c_l, const int q_l, double r) : dynamic_time_warping(c_seq, q_seq, c_l, q_l) {
         if (!(quant_q = new double[q_l])) { throw ME; }
         if (!(quant_c = new double[c_l])) { throw ME; }
@@ -529,6 +519,7 @@ public:
         {
             int* idxC;
             int* idxQ;
+
             if (!(idxC = new int[len_c])) { throw ME; }
             if (!(idxQ = new int[len_q])) { throw ME; }
 
@@ -594,7 +585,10 @@ public:
                 ln[0][0] = x - 1;
                 ln[0][1] = y;
             }
-            else { ln[0] = NULL; }
+            else
+            {
+                ln[0] = NULL;
+            }
 
             if (x - 1 >= 0 && y - 1 >= 0)
             {
@@ -738,6 +732,16 @@ public:
             int** lower_n;
             if (!(lower_n = new int* [3])) { throw ME; }
             lower_n = lower_neighbors(x, y);
+
+            for (int i = 0; i < 3; i++)
+            {
+                if (lower_n[i] != NULL)
+                {
+                    if (matrix_transforms[lower_n[i][0]][lower_n[i][1]] == 0) { lower_n[i] = NULL; }
+                }
+            }
+            if (lower_n[0] == NULL && lower_n[1] == NULL && lower_n[2] == NULL) { lower_n = NULL; }
+
             if (lower_n != NULL)
             {
 
@@ -745,13 +749,6 @@ public:
                 int* lowest;
                 if (!(lowest = new int[2])) { throw ME; }
 
-                for (int i = 0; i < 3; i++)
-                {
-                    if (lower_n[i] != nullptr)
-                    {
-                        if (matrix_transforms[lower_n[i][0]][lower_n[i][1]] == 0) { lower_n[i] = NULL; }
-                    }
-                }
 
                 lowest = lower_n[0];
                 for (int i = 1; i < 3; i++)
@@ -759,7 +756,7 @@ public:
                     if (lowest == NULL) { lowest = lower_n[i]; }
                     else if (i < 3 && lower_n[i] != NULL)
                     {
-                        if (lowest > lower_n[i]) { lowest = lower_n[i]; }
+                        if (matrix_transforms[lowest[0]][lowest[1]] > matrix_transforms[lower_n[i][0]][lower_n[i][1]]) { lowest = lower_n[i]; }
                     }
                 }
                 way_coords[f][0] = lowest[0];
@@ -777,24 +774,45 @@ public:
             way[i] = matrix_transforms[way_coords[i][0]][way_coords[i][1]];
         }
     }
-
 };
-
-
-
 
 
 int main()
 {
-    double a[4] = { 1, 2, 4, 1 };
-    double b[4] = { 1, 5, 4, 2 };
+    double a[16] = { 1, 2, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+    double b[16] = { 1, 5, 4, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
 
-    fast_dynamic_time_warping fw = fast_dynamic_time_warping(a, b, 4, 4, 2);
+    auto s = steady_clock::now();
+    dynamic_time_warping w = dynamic_time_warping(a, b, 16, 16);
+    w.find_matrix_transforms_default();
+    w.make_way_default();
+    w.print_way();
+    auto f = steady_clock::now();
+
+    cout << "Time for cDTW " << duration_cast<chrono::nanoseconds>(f - s).count() << "\n";
+
+    s = steady_clock::now();
+
+    fast_dynamic_time_warping fw = fast_dynamic_time_warping(a, b, 16, 16, 1);
     fw.fast_dtw();
     fw.print_way();
 
-}
+    f = steady_clock::now();
 
+    cout << "Time for FAST-DTW " << duration_cast<chrono::nanoseconds>(f - s).count() << "\n";
+
+    s = steady_clock::now();
+
+    Sparce_DTW sw = Sparce_DTW(a, b, 16, 16, 0.5);
+    sw.populate_warp();
+    sw.calculate_warp_costs();
+    sw.calculate_warp_path();
+    sw.print_way();
+
+    f = steady_clock::now();
+
+    cout << "Time for SPARSE-DTW " << duration_cast<chrono::nanoseconds>(f - s).count() << "\n";
+}
 
 
 // histogram equalization 
